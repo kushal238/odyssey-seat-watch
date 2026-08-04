@@ -1,12 +1,18 @@
 name: seat-watch
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
+    inputs:
+      test_ping:
+        description: "send a test push from the cloud"
+        default: "0"
 
 permissions:
   contents: write
 
+# one job runs a 27-min check loop; the 15-min cron keeps a successor queued
+# (cancel-in-progress false = it waits), so 1-min coverage is near-seamless
 concurrency:
   group: seat-watch
   cancel-in-progress: false
@@ -14,13 +20,14 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Check seats (fast path, no browser)
+      - name: Check seats every 60s (fast path, no browser)
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           AMC_COOKIES: ${{ secrets.AMC_COOKIES }}
+          TEST_PING: ${{ github.event.inputs.test_ping || '0' }}
         run: python3 cloud_check.py
       - name: Commit state
         if: always()
@@ -28,4 +35,4 @@ jobs:
           git config user.name "seat-watch-bot"
           git config user.email "actions@users.noreply.github.com"
           git add state.json 2>/dev/null || true
-          git diff --cached --quiet || (git commit -m "update state" && git pull --rebase && git push)
+          git diff --cached --quiet || (git commit -m "update state" && git pull --rebase -X ours && git push)

@@ -27,7 +27,8 @@ TARGETS = [
     ("2026-08-09 10:00am", "144696966"),
 ]
 RENOTIFY_SECONDS = 2 * 3600
-CONSEC_FAIL_ALERT = 24  # ~2h of failed 5-min runs before the stale-cookie alert
+CONSEC_FAIL_ALERT = 120  # ~2h of failed 1-min cycles before the stale-cookie alert
+LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))
 NTFY_TOPIC = os.environ["NTFY_TOPIC"]
 STATE_FILE = Path(__file__).resolve().parent / "state.json"
 UA = (
@@ -82,16 +83,7 @@ def fetch_counts(sid, cookie_hdr):
     return len(regular), len(avail), len(seats)
 
 
-def main():
-    if datetime.now(timezone.utc) > datetime(2026, 8, 10, 7, tzinfo=timezone.utc):
-        log("past targets; disable the workflow")
-        return 0
-
-    cookies = json.loads(os.environ["AMC_COOKIES"])
-    cookie_hdr = "; ".join(
-        f"{c['name']}={c['value']}" for c in cookies if "amctheatres.com" in c["domain"]
-    )
-    state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
+def check_cycle(state, cookie_hdr, verbose):
     now = time.time()
     run_failed = False
 
@@ -106,8 +98,10 @@ def main():
             state[key] = entry
             continue
         entry["status"] = "open" if regular > 0 else "full"
+        changed = [regular, avail] != prev.get("last_counts")
         entry["last_counts"] = [regular, avail]
-        log(f"{key}: {regular} regular seats open ({avail} incl. wheelchair, {total} total)")
+        if verbose or changed:
+            log(f"{key}: {regular} regular seats open ({avail} incl. wheelchair, {total} total)")
         just_opened = regular > 0 and prev.get("status") != "open"
         renotify = regular > 0 and now - prev.get("last_notified", 0) > RENOTIFY_SECONDS
         if just_opened or renotify:
@@ -133,6 +127,28 @@ def main():
         state["_consecutive_failures"] = 0
 
     STATE_FILE.write_text(json.dumps(state, indent=1))
+
+
+def main():
+    if datetime.now(timezone.utc) > datetime(2026, 8, 10, 7, tzinfo=timezone.utc):
+        log("past targets; disable the workflow")
+        return 0
+
+    cookies = json.loads(os.environ["AMC_COOKIES"])
+    cookie_hdr = "; ".join(
+        f"{c['name']}={c['value']}" for c in cookies if "amctheatres.com" in c["domain"]
+    )
+    state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
+
+    if os.environ.get("TEST_PING") == "1":
+        notify("Cloud test ping", "This check ran on GitHub's servers, not your Mac. "
+               "Cloud checks are live at ~1/min.", priority="high")
+        log("test ping sent")
+
+    for i in range(LOOP_MINUTES):
+        check_cycle(state, cookie_hdr, verbose=(i == 0))
+        if i < LOOP_MINUTES - 1:
+            time.sleep(60)
     return 0
 
 
