@@ -14,11 +14,12 @@
   ]
  },
  "2026-08-09 10:00am": {
-  "status": "full",
+  "status": "open",
   "last_counts": [
-   0,
-   12
-  ]
+   1,
+   13
+  ],
+  "last_notified": 1785857457.3271933
  },
- "_consecutive_failures": 92
+ "_consecutive_failures": 10
 }
