@@ -1,7 +1,7 @@
 name: seat-watch
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -14,20 +14,14 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install Playwright
-        run: |
-          pip -q install playwright
-          playwright install --with-deps chromium
-      - name: Check seats
+      - name: Check seats (fast path, no browser)
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python cloud_check.py
+          AMC_COOKIES: ${{ secrets.AMC_COOKIES }}
+        run: python3 cloud_check.py
       - name: Commit state
         if: always()
         run: |
