@@ -11,12 +11,6 @@ on:
 permissions:
   contents: write
 
-# one job runs a 27-min check loop; the 15-min cron keeps a successor queued
-# (cancel-in-progress false = it waits), so 1-min coverage is near-seamless
-concurrency:
-  group: seat-watch
-  cancel-in-progress: false
-
 jobs:
   check:
     runs-on: ubuntu-latest
