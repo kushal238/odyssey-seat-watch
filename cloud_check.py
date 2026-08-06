@@ -129,12 +129,45 @@ def check_cycle(state, cookie_hdr, verbose):
     STATE_FILE.write_text(json.dumps(state, indent=1))
 
 
+def mint_cookies_in_runner():
+    """Try to earn a fresh session from this runner's own IP (rotates per job).
+    Returns a cookie list on success, None if the bot wall blocks the runner."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return None
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(user_agent=UA,
+                                      viewport={"width": 1400, "height": 1000})
+            ctx.route("**/*", lambda route: route.abort()
+                      if route.request.resource_type in ("image", "media", "font")
+                      else route.continue_())
+            page = ctx.new_page()
+            page.goto(SEATS_URL.format(sid=TARGETS[0][1]),
+                      wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_function(
+                """() => Array.from(document.querySelectorAll('[aria-label]'))
+                    .filter(e => /\\b[A-Z]{1,2}\\d{1,2}$/.test(e.getAttribute('aria-label')))
+                    .length > 50""",
+                timeout=45000,
+            )
+            cookies = ctx.cookies()
+            browser.close()
+            log("self-minted fresh cookies from runner IP")
+            return cookies
+    except Exception as e:
+        log(f"self-mint failed ({type(e).__name__}); falling back to secret cookies")
+        return None
+
+
 def main():
     if datetime.now(timezone.utc) > datetime(2026, 8, 10, 7, tzinfo=timezone.utc):
         log("past targets; disable the workflow")
         return 0
 
-    cookies = json.loads(os.environ["AMC_COOKIES"])
+    cookies = mint_cookies_in_runner() or json.loads(os.environ["AMC_COOKIES"])
     cookie_hdr = "; ".join(
         f"{c['name']}={c['value']}" for c in cookies if "amctheatres.com" in c["domain"]
     )
