@@ -13,7 +13,7 @@
    0,
    9
   ],
-  "last_notified": 1786079893.7141695
+  "last_notified": 1786125264.0864158
  },
  "2026-08-09 10:00am": {
   "status": "full",
@@ -23,5 +23,5 @@
   ],
   "last_notified": 1785871946.183861
  },
- "_consecutive_failures": 8
+ "_consecutive_failures": 7
 }
