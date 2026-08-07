@@ -1,1 +1,1 @@
-Test notification from the cloud session, take 2. If this reached your phone, the commit relay works end to end. Sent 2026-08-07 ~18:25 UTC.
+Test 3 from the cloud session, using the updated relay workflow. Sent ~18:35 UTC. If this arrived, you're all set.
