@@ -58,6 +58,14 @@ usually pass the browser path; if blocked, fall back to reading
 `state.json` (committed by fleet runs) and the ntfy topic history
 (`https://ntfy.sh/<topic>/json?poll=1&since=6h`).
 
+## IMPORTANT for cloud/sandbox agents: you CANNOT send phone notifications
+Verified 2026-08-07: Anthropic cloud sandboxes block outbound traffic to
+ntfy.sh — your curl will fail or silently vanish; nothing reaches Kushal's
+phone. Do NOT rely on ntfy from a sandbox. Phone pushes are the fleet's job
+(GitHub runners CAN reach ntfy). If you need Kushal urgently, say it in your
+chat transcript — he checks it — and/or commit a file named URGENT.md to this
+repo's main branch so other agents see it.
+
 ## Division of labor if you are a takeover agent
 You likely CANNOT: dispatch workflows (no gh auth), touch Kushal's Mac.
 You CAN: monitor fleet via public API, verify seat status via browser,
