@@ -178,6 +178,10 @@ def main():
                "Cloud checks are live at ~1/min.", priority="high")
         log("test ping sent")
 
+    # stagger parallel runs so their 60s cycles interleave across runner IPs
+    stagger = int(os.environ.get("GITHUB_RUN_ID", "0")) % 45
+    log(f"stagger offset: {stagger}s")
+    time.sleep(stagger)
     for i in range(LOOP_MINUTES):
         check_cycle(state, cookie_hdr, verbose=(i == 0))
         if i < LOOP_MINUTES - 1:
