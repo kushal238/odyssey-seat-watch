@@ -1,8 +1,10 @@
 name: notify-relay
 on:
   push:
+    branches: ["**"]
     paths:
       - "notify/**"
+  workflow_dispatch:
 
 jobs:
   relay:
@@ -12,14 +14,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - name: Forward new notify files to ntfy
+      - name: Forward changed/added notify files to ntfy
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
-          for f in $(git diff --name-only HEAD~1 HEAD -- notify/ | head -5); do
+          FILES=$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- notify/ 2>/dev/null | grep '\.md$' | grep -v README || true)
+          [ -z "$FILES" ] && FILES=$(ls notify/*.md 2>/dev/null | grep -v README | head -3)
+          for f in $FILES; do
             [ -f "$f" ] || continue
             title=$(basename "$f" .md | tr '-' ' ')
-            curl -s -H "Title: Agent relay: $title" -H "Priority: high" -H "Tags: robot" \
+            curl -s -H "Title: Agent: $title" -H "Priority: high" -H "Tags: robot" \
               --data-binary @"$f" "https://ntfy.sh/$NTFY_TOPIC"
             echo "relayed $f"
           done
