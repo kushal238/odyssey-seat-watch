@@ -83,11 +83,12 @@ def fetch_counts(sid, cookie_hdr):
     return len(regular), len(avail), len(seats)
 
 
-def check_cycle(state, cookie_hdr, verbose):
+def check_cycle(state, cookie_hdr, verbose, only=None):
     now = time.time()
     run_failed = False
 
-    for key, sid in TARGETS:
+    targets = [only] if only else TARGETS
+    for key, sid in targets:
         prev = state.get(key, {})
         entry = dict(prev)
         try:
@@ -182,8 +183,20 @@ def main():
     stagger = int(os.environ.get("GITHUB_RUN_ID", "0")) % 45
     log(f"stagger offset: {stagger}s")
     time.sleep(stagger)
+    deaf_streak = 0
+    remints = 0
     for i in range(LOOP_MINUTES):
-        check_cycle(state, cookie_hdr, verbose=(i == 0))
+        target = TARGETS[i % len(TARGETS)]
+        failed = check_cycle(state, cookie_hdr, verbose=(i == 0), only=target)
+        deaf_streak = deaf_streak + 1 if failed else 0
+        if deaf_streak >= 4 and remints < 2:
+            log("session deaf; re-minting mid-run")
+            fresh = mint_cookies_in_runner()
+            if fresh:
+                cookie_hdr = "; ".join(f"{c['name']}={c['value']}" for c in fresh
+                                       if "amctheatres.com" in c["domain"])
+            remints += 1
+            deaf_streak = 0
         if i < LOOP_MINUTES - 1:
             time.sleep(60)
     return 0
