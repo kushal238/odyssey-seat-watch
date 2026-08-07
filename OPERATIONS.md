@@ -48,3 +48,18 @@ Seat-drop pattern: 1-3 regular seats appear for 1-15 min, a few times/day,
 clustered early morning + evening. Front-row A8 (Fri) cycled open/closed
 repeatedly overnight Aug 6-7. Fandango napi (`theaterMovieShowtimes/AANEM`)
 counts wheelchair seats as "available" — do not trust it for this mission.
+
+## Checking seats yourself (from any sandbox)
+`pip install playwright && playwright install --with-deps chromium`, then load
+the seat page in headless Chromium and parse aria-labels (working reference:
+`mint_cookies_in_runner()` + `fetch_counts()` in `cloud_check.py`). Raw HTTP
+without browser-earned cookies gets a Queue-it JS wall. Sandbox/datacenter IPs
+usually pass the browser path; if blocked, fall back to reading
+`state.json` (committed by fleet runs) and the ntfy topic history
+(`https://ntfy.sh/<topic>/json?poll=1&since=6h`).
+
+## Division of labor if you are a takeover agent
+You likely CANNOT: dispatch workflows (no gh auth), touch Kushal's Mac.
+You CAN: monitor fleet via public API, verify seat status via browser,
+push ntfy alerts, and advise Kushal. The fleet dispatches itself; the hourly
+watchdog routine handles restarts. Your job is judgment, not plumbing.
