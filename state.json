@@ -16,12 +16,12 @@
   "last_notified": 1786140906.3849318
  },
  "2026-08-09 10:00am": {
-  "status": "full",
+  "status": "open",
   "last_counts": [
-   0,
-   12
+   1,
+   13
   ],
-  "last_notified": 1786135498.097799
+  "last_notified": 1786146251.3363225
  },
  "_consecutive_failures": 7
 }
