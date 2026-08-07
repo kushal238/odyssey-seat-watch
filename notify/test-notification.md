@@ -1,1 +1,1 @@
-Test 3 from the cloud session, using the updated relay workflow. Sent ~18:35 UTC. If this arrived, you're all set.
+Test notification, on request. Sent 19:35 UTC Aug 7. Relay still working.
