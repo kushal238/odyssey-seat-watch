@@ -80,7 +80,8 @@ def fetch_counts(sid, cookie_hdr):
         raise RuntimeError("no seats in HTML")
     avail = [l for l in seats if not l.startswith("Occupied")]
     regular = [l for l in avail if "Wheelchair" not in l and "Companion" not in l]
-    return len(regular), len(avail), len(seats)
+    codes = [SEAT_CODE_RE.search(l).group(0) for l in regular]
+    return len(regular), len(avail), len(seats), codes
 
 
 def check_cycle(state, cookie_hdr, verbose, only=None):
@@ -92,7 +93,7 @@ def check_cycle(state, cookie_hdr, verbose, only=None):
         prev = state.get(key, {})
         entry = dict(prev)
         try:
-            regular, avail, total = fetch_counts(sid, cookie_hdr)
+            regular, avail, total, codes = fetch_counts(sid, cookie_hdr)
         except Exception as e:
             log(f"{key}: check failed: {e}")
             run_failed = True
@@ -108,7 +109,7 @@ def check_cycle(state, cookie_hdr, verbose, only=None):
         if just_opened or renotify:
             notify(
                 "Odyssey IMAX 70mm - Metreon",
-                f"{key}: {regular} regular seat(s) OPEN - tap to pick seats",
+                f"{key}: {regular} seat(s) OPEN: {', '.join(codes[:8])} - tap to buy",
                 click_url=SEATS_URL.format(sid=sid),
             )
             entry["last_notified"] = now
