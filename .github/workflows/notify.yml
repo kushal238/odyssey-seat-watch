@@ -1,0 +1,25 @@
+name: notify-relay
+on:
+  push:
+    paths:
+      - "notify/**"
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Forward new notify files to ntfy
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          for f in $(git diff --name-only HEAD~1 HEAD -- notify/ | head -5); do
+            [ -f "$f" ] || continue
+            title=$(basename "$f" .md | tr '-' ' ')
+            curl -s -H "Title: Agent relay: $title" -H "Priority: high" -H "Tags: robot" \
+              --data-binary @"$f" "https://ntfy.sh/$NTFY_TOPIC"
+            echo "relayed $f"
+          done
