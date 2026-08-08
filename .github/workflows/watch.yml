@@ -1,7 +1,5 @@
 name: seat-watch
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       test_ping:
@@ -28,14 +26,6 @@ jobs:
           AMC_COOKIES: ${{ secrets.AMC_COOKIES }}
           TEST_PING: ${{ github.event.inputs.test_ping || '0' }}
         run: python3 cloud_check.py
-      - name: Dispatch successor (self-perpetuating chain)
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ "$(date -u +%Y%m%d)" -le 20260810 ]; then
-            gh workflow run seat-watch --repo ${{ github.repository }} || true
-          fi
       - name: Commit state
         if: always()
         run: |
