@@ -8,12 +8,12 @@
   "last_notified": 1786147304.601941
  },
  "2026-08-08 10:00am": {
-  "status": "full",
+  "status": "open",
   "last_counts": [
-   0,
-   9
+   1,
+   10
   ],
-  "last_notified": 1786140906.3849318
+  "last_notified": 1786148216.5403361
  },
  "2026-08-09 10:00am": {
   "status": "open",
