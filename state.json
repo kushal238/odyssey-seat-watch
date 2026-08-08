@@ -1,11 +1,11 @@
 {
  "2026-08-07 10:00pm": {
-  "status": "full",
+  "status": "open",
   "last_counts": [
-   0,
-   3
+   3,
+   6
   ],
-  "last_notified": 1786153643.5138407
+  "last_notified": 1786156129.0990748
  },
  "2026-08-08 10:00am": {
   "status": "full",
