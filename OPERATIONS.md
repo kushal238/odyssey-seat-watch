@@ -45,6 +45,28 @@ history below is from that.)
    the `AMC_COOKIES` secret it used to upload is only a fallback if runner
    self-minting is blocked.
 
+## Nov 2026 findings: no cloud runner can see the seat maps any more
+Tested 2026-11-07 from GitHub-hosted runners (Azure) and an Anthropic sandbox:
+- **AMC**: Cloudflare error 1020 "Sorry, you have been blocked" on the
+  showtimes and seat pages, before any JS challenge. Real UA or not, headless
+  or not. Cookies irrelevant. (Aug 2026 it was a solvable challenge.)
+- **Fandango** (sells the same AMC reserved seats): the Metreon listing and
+  the checkout pages load fine, BUT the seat picker's call to
+  `/checkoutapi/showtimes/v2/<showtimeId>/seat-map` answers `302 Location:
+  www.fandango.com` (literal, no scheme), which the browser resolves to a
+  404 and the page shows "not found. Please try again". Kushal's laptop on a
+  home connection gets the seat map. So: IP-reputation gating, same category.
+- **Atom Tickets**: Cloudflare "Just a moment" challenge; not pursued.
+Conclusion: polling has to come from residential connections. Do not try to
+disguise datacenter traffic; that's the fast lane to getting accounts banned.
+
+Useful by-products: Fandango's listing (`theater-page?date=YYYY-MM-DD`) is a
+reliable, unwalled source for *showtimes* (Dune 70mm at Metreon: 7:30a,
+11:00a, 2:30p, 6:00p, 9:30p daily; Fandango tid `AANEM`, mid `245188` for the
+IMAX 70MM version, `244800` for standard). `fandango_check.py` is a complete
+checker for that path that only lacks a working seat-map response; if
+Fandango ever serves it to runners again, `fandango-dry-run` will show it.
+
 ## Fleet of friends (how to get August-level coverage now)
 The Aug fleet's ~30-45s per-show coverage came from 4-8 pollers at 1 req/min
 each on DIFFERENT IPs. The same thing with people instead of runners:

@@ -1,13 +1,7 @@
 name: discover-showtimes
 on:
-  # pushes to a feature branch run a DRY RUN (log only) so changes can be
-  # tested before the workflow lands on main and becomes dispatchable
-  push:
-    branches: ["claude/**"]
-    paths:
-      - discover_showtimes.py
-      - targets.json
-      - .github/workflows/discover.yml
+  # AMC blocks GitHub-hosted runners (Nov 2026); only useful on a self-hosted
+  # runner. Dry-run first (dry_run=1) and read the log.
   workflow_dispatch:
     inputs:
       dry_run:

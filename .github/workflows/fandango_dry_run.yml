@@ -2,10 +2,10 @@ name: fandango-dry-run
 # Test harness: run fandango_check.py once over every target in DRY_RUN mode
 # (verbose, no alerts, no state) on a GitHub runner. Fires on pushes to feature
 # branches that touch the checker or targets, or by hand.
+# Verified 2026-11-07: from GitHub runners Fandango's checkout API answers the
+# seat-map call with a 302 to "www.fandango.com" (-> 404 "not found"), while a
+# home browser gets the map. Kept for re-testing by hand only.
 on:
-  push:
-    branches: ["claude/**"]
-    paths: [fandango_check.py, targets.json, .github/workflows/fandango_dry_run.yml]
   workflow_dispatch:
 
 jobs:

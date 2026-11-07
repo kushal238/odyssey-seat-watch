@@ -4,10 +4,10 @@ name: seat-watch
 # that starts a run when the fleet is below size. Both paths are capped by the
 # gate step, so the fleet can't run away like it did in Aug 2026 (19+ runs).
 #
-# Source: fandango_check.py reads Fandango's seat map for the same AMC seats,
-# because AMC's own site hard-blocks datacenter IPs since Nov 2026. If Fandango
-# ever blocks too, set repo variables SEAT_WATCH_RUNNER=self-hosted and
-# FLEET_SIZE=1 and run on a home connection (see OPERATIONS.md).
+# Since Nov 2026 BOTH AMC (Cloudflare 1020) and Fandango (checkout API bounces
+# the session) refuse datacenter IPs, so GitHub-hosted runners can't check
+# seats any more. Run this on a self-hosted runner on a home connection: set
+# repo variables SEAT_WATCH_RUNNER=self-hosted and FLEET_SIZE=1 (OPERATIONS.md).
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -55,11 +55,13 @@ jobs:
           python3 -m pip -q install playwright
           if [ "$RUNNER_OS" = "Linux" ]; then python3 -m playwright install --with-deps chromium 2>&1 | tail -1
           else python3 -m playwright install chromium 2>&1 | tail -1; fi
-      - name: Check seats every 60s (Fandango seat map)
+      - name: Check seats every 60s
         if: steps.gate.outputs.go == '1'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python3 fandango_check.py
+          AMC_COOKIES: ${{ secrets.AMC_COOKIES }}
+          TEST_PING: ${{ github.event.inputs.test_ping || '0' }}
+        run: python3 cloud_check.py
       - name: Dispatch successor (self-perpetuating chain, capped)
         if: always() && steps.gate.outputs.go == '1'
         env:
