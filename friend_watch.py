@@ -98,9 +98,9 @@ def main():
     poll = max(60, args.poll or cfg.get("poll_seconds", 60))
     renotify = cfg.get("renotify_seconds", 7200)
     retire = datetime.fromisoformat(cfg["retire_after_utc"])
-    targets = data["targets"]
+    targets = [t for t in data["targets"] if t.get("sid")]
     if not targets:
-        log("targets.json has no showtimes yet; ask the organiser, then rerun")
+        log("targets.json has no showtimes with AMC ids yet; ask the organiser, then rerun")
         return 1
     log(f"{cfg['movie_name']}: watching {len(targets)} showtime(s) every {poll}s as {args.name!r}")
     for t in targets:
@@ -131,8 +131,9 @@ def main():
             if time.time() - last_refresh > 1800:
                 try:
                     data = fetch_targets(args.targets)
-                    if [t["sid"] for t in data["targets"]] != [t["sid"] for t in targets]:
-                        targets = data["targets"]
+                    fresh = [t for t in data["targets"] if t.get("sid")]
+                    if fresh and [t["sid"] for t in fresh] != [t["sid"] for t in targets]:
+                        targets = fresh
                         log(f"targets updated: {[t['label'] for t in targets]}")
                 except Exception as e:
                     log(f"could not refresh targets ({e}); keeping current list")

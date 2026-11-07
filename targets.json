@@ -70,7 +70,7 @@
   },
   {
    "label": "Sat 2026-12-26 11:00am",
-   "sid": null,
+   "sid": "146156956",
    "date": "2026-12-26",
    "time": "11:00am",
    "format": "IMAX 70mm",
@@ -96,7 +96,7 @@
   },
   {
    "label": "Sun 2026-12-27 11:00am",
-   "sid": null,
+   "sid": "146156963",
    "date": "2026-12-27",
    "time": "11:00am",
    "format": "IMAX 70mm",
@@ -107,5 +107,6 @@
     "t": "11:00"
    }
   }
- ]
+ ],
+ "notes": "AMC showtime ids (sid) supplied by Kushal 2026-11-07 for Sat/Sun 11am. Targets without sid are skipped by the pollers; fill sid from the AMC seat page URL to watch them."
 }
