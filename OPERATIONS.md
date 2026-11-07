@@ -42,6 +42,30 @@ history below is from that.)
    the `AMC_COOKIES` secret it used to upload is only a fallback if runner
    self-minting is blocked.
 
+## Self-hosted runner (needed since Nov 2026)
+Verified 2026-11-07: AMC's Cloudflare now hard-blocks datacenter IPs — GitHub
+runners (Azure) and Anthropic sandboxes get error 1020 "Sorry, you have been
+blocked" on both the showtimes and seat pages, before any JS challenge. In Aug
+it was a solvable challenge. Cookies don't help (the block is per IP). So the
+checker has to run from a home connection, as a normal visitor at 1 req/min.
+The workflows support this unchanged via a self-hosted runner:
+
+1. On the Mac: GitHub repo → Settings → Actions → Runners → New self-hosted
+   runner → macOS; run the 3 download/config commands it shows, then
+   `./svc.sh install && ./svc.sh start` so it survives reboots/logouts.
+   Needs `python3` on PATH (Xcode CLT or Homebrew). Keep the Mac awake
+   (plugged in, lid open, or `caffeinate -s`).
+2. Repo → Settings → Secrets and variables → Actions → **Variables**:
+   `SEAT_WATCH_RUNNER` = `self-hosted`, `FLEET_SIZE` = `1` (one runner = one
+   job at a time; a bigger cap just queues runs).
+3. Actions → `discover-showtimes` → Run workflow (dry_run=1 first, read the
+   log, then dry_run=0 to commit `targets.json`).
+4. Actions → `seat-watch` → Run workflow. The cron keeps it alive from there.
+
+Home IP caveat: the Mac's IP was 429-banned by AMC in Aug 2026 after
+over-polling. If seat checks return 429 in the log, stop and wait it out —
+do not add retries. Never run more than one checker on the same home IP.
+
 ## Notifications
 - ntfy topic: `odyssey-matreon-1e6c2f30205d` (Kushal's iPhone subscribes; note
   the intentional "matreon" typo). Send via:

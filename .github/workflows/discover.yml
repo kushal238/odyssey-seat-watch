@@ -26,14 +26,15 @@ concurrency:
 
 jobs:
   discover:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SEAT_WATCH_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Install Playwright
         run: |
-          pip -q install playwright
-          playwright install --with-deps chromium 2>&1 | tail -1
+          python3 -m pip -q install playwright
+          if [ "$RUNNER_OS" = "Linux" ]; then python3 -m playwright install --with-deps chromium 2>&1 | tail -1
+          else python3 -m playwright install chromium 2>&1 | tail -1; fi
       - name: Discover showtime IDs
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}

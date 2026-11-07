@@ -3,6 +3,11 @@ name: seat-watch
 # Each run dispatches one successor as it finishes; the cron is only a top-up
 # that starts a run when the fleet is below size. Both paths are capped by the
 # gate step, so the fleet can't run away like it did in Aug 2026 (19+ runs).
+#
+# Runner: GitHub-hosted by default. Since Nov 2026 AMC's Cloudflare hard-blocks
+# datacenter IPs (error 1020), so set repo variables SEAT_WATCH_RUNNER=self-hosted
+# and FLEET_SIZE=1 to run on a self-hosted runner on a home connection instead
+# (see OPERATIONS.md "Self-hosted runner").
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -17,12 +22,12 @@ permissions:
   actions: write
 
 env:
-  FLEET_SIZE: 4
+  FLEET_SIZE: ${{ vars.FLEET_SIZE || 4 }}
   RETIRE_AFTER_YMD: 20261228   # keep in sync with retire_after_utc in targets.json
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.SEAT_WATCH_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -37,11 +42,7 @@ jobs:
           if [ "$(python3 -c 'import json;print(len(json.load(open("targets.json"))["targets"]))')" = "0" ]; then
             echo "no targets yet (run discover-showtimes)"; echo "go=0" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          active=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
-                     --status in_progress --json databaseId --jq 'length')
-          queued=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
-                     --status queued --json databaseId --jq 'length')
-          others=$((active + queued - 1))   # exclude this run
+          others=$(python3 fleet_count.py)   # active + queued seat-watch runs, excluding this one
           echo "fleet: $others other runs active/queued (cap $FLEET_SIZE)"
           if [ "$others" -ge "$FLEET_SIZE" ]; then
             echo "fleet full; this run exits"; echo "go=0" >> "$GITHUB_OUTPUT"
@@ -51,8 +52,9 @@ jobs:
       - name: Install Playwright (for cookie self-minting)
         if: steps.gate.outputs.go == '1'
         run: |
-          pip -q install playwright
-          playwright install --with-deps chromium 2>&1 | tail -1
+          python3 -m pip -q install playwright
+          if [ "$RUNNER_OS" = "Linux" ]; then python3 -m playwright install --with-deps chromium 2>&1 | tail -1
+          else python3 -m playwright install chromium 2>&1 | tail -1; fi
       - name: Check seats every 60s
         if: steps.gate.outputs.go == '1'
         env:
@@ -66,13 +68,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           [ "$(date -u +%Y%m%d)" -le "$RETIRE_AFTER_YMD" ] || exit 0
-          active=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
-                     --status in_progress --json databaseId --jq 'length')
-          queued=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
-                     --status queued --json databaseId --jq 'length')
-          others=$((active + queued - 1))
+          others=$(python3 fleet_count.py)
           if [ "$others" -lt "$FLEET_SIZE" ]; then
-            gh workflow run seat-watch --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" || true
+            python3 fleet_count.py dispatch || true
             echo "dispatched successor ($others others active)"
           else
             echo "fleet full ($others others active); no successor"
