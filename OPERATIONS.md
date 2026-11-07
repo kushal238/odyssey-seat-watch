@@ -88,11 +88,13 @@ it was a solvable challenge. Cookies don't help (the block is per IP). So the
 checker has to run from a home connection, as a normal visitor at 1 req/min.
 The workflows support this unchanged via a self-hosted runner:
 
-1. On the Mac: GitHub repo → Settings → Actions → Runners → New self-hosted
-   runner → macOS; run the 3 download/config commands it shows, then
-   `./svc.sh install && ./svc.sh start` so it survives reboots/logouts.
-   Needs `python3` on PATH (Xcode CLT or Homebrew). Keep the Mac awake
-   (plugged in, lid open, or `caffeinate -s`).
+1. On the box (Raspberry Pi 5 / Debian / Ubuntu / Mac): repo → Settings →
+   Actions → Runners → New self-hosted runner, copy the registration token,
+   then run `local/setup_runner.sh <token>` (installs Python, Playwright
+   Chromium and the runner as a boot service). Or do it by hand: run the 3
+   commands GitHub shows, then `./svc.sh install && ./svc.sh start`. An
+   always-on Pi or mini PC on the home router is the "remote watch" that
+   works; a laptop works too if kept awake (`caffeinate -s`).
 2. Repo → Settings → Secrets and variables → Actions → **Variables**:
    `SEAT_WATCH_RUNNER` = `self-hosted`, `FLEET_SIZE` = `1` (one runner = one
    job at a time; a bigger cap just queues runs).
