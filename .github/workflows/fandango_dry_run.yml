@@ -1,0 +1,24 @@
+name: fandango-dry-run
+# Test harness: run fandango_check.py once over every target in DRY_RUN mode
+# (verbose, no alerts, no state) on a GitHub runner. Fires on pushes to feature
+# branches that touch the checker or targets, or by hand.
+on:
+  push:
+    branches: ["claude/**"]
+    paths: [fandango_check.py, targets.json, .github/workflows/fandango_dry_run.yml]
+  workflow_dispatch:
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright
+        run: |
+          python3 -m pip -q install playwright
+          python3 -m playwright install --with-deps chromium 2>&1 | tail -1
+      - name: Dry run
+        env:
+          DRY_RUN: "1"
+        run: python3 fandango_check.py

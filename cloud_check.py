@@ -25,7 +25,7 @@ from pathlib import Path
 SEATS_URL = "https://www.amctheatres.com/showtimes/{sid}/seats"
 TARGETS_FILE = Path(__file__).resolve().parent / "targets.json"
 _TARGETS_DATA = json.loads(TARGETS_FILE.read_text())
-TARGETS = [(t["label"], t["sid"]) for t in _TARGETS_DATA["targets"]]
+TARGETS = [(t["label"], t["sid"]) for t in _TARGETS_DATA["targets"] if t.get("sid")]
 MOVIE_NAME = _TARGETS_DATA["config"]["movie_name"]
 RETIRE_AFTER = datetime.fromisoformat(_TARGETS_DATA["config"]["retire_after_utc"])
 RENOTIFY_SECONDS = 2 * 3600
