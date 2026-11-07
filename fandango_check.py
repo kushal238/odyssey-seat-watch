@@ -187,7 +187,8 @@ def fetch_availability(ctx, t, timeout_ms=60000):
         page.on("response", lambda r: _log_xhr(r))
     try:
         with page.expect_response(
-            lambda r: "seatpicker/Default.aspx" in r.url and "action=availability" in r.url,
+            lambda r: ("seatpicker/Default.aspx" in r.url and "action=availability" in r.url)
+            or ("/checkoutapi/showtimes/" in r.url and "seat-map" in r.url and r.status == 200),
             timeout=timeout_ms,
         ) as info:
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
@@ -206,7 +207,7 @@ def fetch_availability(ctx, t, timeout_ms=60000):
 
 def _log_xhr(r):
     u = r.url
-    if "fandango.com" not in u or re.search(r"\.(css|js|png|jpg|gif|svg|woff2?)(\?|$)", u):
+    if "tickets.fandango.com" not in u or re.search(r"\.(css|js|png|jpg|gif|svg|woff2?)(\?|$)", u):
         return
     body = ""
     try:
@@ -214,7 +215,12 @@ def _log_xhr(r):
             body = re.sub(r"\s+", " ", r.text())[:300]
     except Exception:
         pass
-    log(f"  xhr {r.status} {r.request.method} {u[:150]} {body}")
+    extra = ""
+    if "checkoutapi" in u or "Default.aspx" in u:
+        loc = r.headers.get("location")
+        req_h = {k: v for k, v in r.request.headers.items() if k.lower() not in ("cookie",)}
+        extra = f"\n      location={loc!r} resp-ct={r.headers.get('content-type')!r}\n      req-headers={json.dumps(req_h)[:700]}"
+    log(f"  xhr {r.status} {r.request.method} {u[:150]} {body}{extra}")
 
 
 def diagnostics(page):
@@ -302,7 +308,8 @@ def main():
         browser, ctx = new_context(p)
         resolve_jump_links(ctx, TARGETS)
         if DRY_RUN:
-            for t in TARGETS:
+            limit = int(os.environ.get("DRY_RUN_LIMIT") or len(TARGETS))
+            for t in TARGETS[:limit]:
                 check_one(ctx, state, t, verbose=True)
                 time.sleep(5)
             browser.close()

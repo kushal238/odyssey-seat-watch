@@ -21,4 +21,5 @@ jobs:
       - name: Dry run
         env:
           DRY_RUN: "1"
+          DRY_RUN_LIMIT: ${{ github.event_name == 'push' && '1' || '' }}
         run: python3 fandango_check.py
