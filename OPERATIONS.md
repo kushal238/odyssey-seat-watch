@@ -9,9 +9,12 @@ history below is from that.)
 
 ## Targets
 - Live list: `targets.json` → `targets[]` (label, AMC showtime id, date, time,
-  format). Written by the `discover-showtimes` workflow, read by the checker.
+  format). Written by the `discover-showtimes` workflow (or by hand from the
+  AMC seat URLs), read by `cloud_check.py` and `friend_watch.py` (which reads
+  it from **main**, so merge target changes to main).
 - Config: `targets.json` → `config` (movie name/slug/regex, theatre, dates,
-  morning cutoff hour, retire date, AMC showtimes page URL patterns).
+  morning cutoff hour, retire date, ntfy topic, poll interval, AMC showtimes
+  page URL patterns).
 - Seat page: `https://www.amctheatres.com/showtimes/<id>/seats`
 - Showtime discovery runs on a GitHub runner (sandboxes can't reach AMC):
   loads the Metreon showtimes page per date in headless Chromium, logs EVERY
@@ -41,6 +44,19 @@ history below is from that.)
    Mac was benched in Aug after the home IP got 429-banned. Not needed now;
    the `AMC_COOKIES` secret it used to upload is only a fallback if runner
    self-minting is blocked.
+
+## Fleet of friends (how to get August-level coverage now)
+The Aug fleet's ~30-45s per-show coverage came from 4-8 pollers at 1 req/min
+each on DIFFERENT IPs. The same thing with people instead of runners:
+`friend_watch.py` is a standalone, no-account, no-secrets poller (README.md is
+the friend-facing instructions). Each friend runs one copy on their own
+connection; it pulls `targets.json` from main every 30 min, loads one seat
+page a minute in headless Chromium, alerts the ntfy topic directly with seat
+codes and the friend's name, backs off on 403/429, and exits after
+`retire_after_utc`. N friends on N connections = each show checked every
+~180/N seconds. Duplicated alerts across friends are accepted (no shared
+state). Kushal's own laptop can run either this or the self-hosted runner
+below; not both on one IP.
 
 ## Self-hosted runner (needed since Nov 2026)
 Verified 2026-11-07: AMC's Cloudflare now hard-blocks datacenter IPs — GitHub
