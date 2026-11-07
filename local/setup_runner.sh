@@ -19,6 +19,9 @@
 #   4. Actions -> seat-watch -> Run workflow. The 15-min cron keeps it alive.
 #
 # Idempotent: re-running updates deps and re-registers the runner.
+# Everything lives under $HOME (runner dir, Playwright browser cache). To undo:
+#   cd ~/actions-runner && ./svc.sh stop && ./svc.sh uninstall && ./config.sh remove --token <token>
+#   rm -rf ~/actions-runner ~/Library/Caches/ms-playwright   (Linux: ~/.cache/ms-playwright)
 set -euo pipefail
 
 REPO_URL="https://github.com/kushal238/odyssey-seat-watch"
@@ -61,8 +64,8 @@ if [ ! -x ./config.sh ]; then
 fi
 if [ -f .runner ]; then
   echo "   already configured; removing old registration first"
-  sudo ./svc.sh stop 2>/dev/null || true
-  sudo ./svc.sh uninstall 2>/dev/null || true
+  if [ "$os" = "Linux" ]; then sudo ./svc.sh stop 2>/dev/null || true; sudo ./svc.sh uninstall 2>/dev/null || true
+  else ./svc.sh stop 2>/dev/null || true; ./svc.sh uninstall 2>/dev/null || true; fi
   ./config.sh remove --token "$TOKEN" || true
 fi
 
@@ -71,9 +74,11 @@ echo "== 3/4 Register runner (labels: self-hosted, seat-watch)"
   --name "seat-watch-$(hostname -s)" --labels seat-watch --work _work --replace
 
 echo "== 4/4 Install as a service that starts on boot"
-sudo ./svc.sh install "$USER"
-sudo ./svc.sh start
-sudo ./svc.sh status | head -5 || true
+if [ "$os" = "Linux" ]; then   # systemd unit (needs sudo); on a Mac it's a per-user LaunchAgent
+  sudo ./svc.sh install "$USER"; sudo ./svc.sh start; sudo ./svc.sh status | head -5 || true
+else
+  ./svc.sh install; ./svc.sh start; ./svc.sh status | head -5 || true
+fi
 
 cat <<EOF
 
