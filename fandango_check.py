@@ -49,6 +49,7 @@ NTFY_TOPIC = os.environ.get("NTFY_TOPIC") or CFG.get("ntfy_topic")
 
 SEATSEL_URL = ("https://tickets.fandango.com/mobileexpress/seatselection"
                "?mid={mid}&chainCode=AMC&sdate={sdate}%20{t}&tid={tid}")
+THEATER_URL = "https://www.fandango.com/amc-metreon-16-aanem/theater-page?date={sdate}"
 BUY_URL_FANDANGO = ("https://tickets.fandango.com/transaction/ticketing/mobile/jump.aspx"
                     "?sdate={sdate}%2B{t}&mid={mid}&tid={tid}&dfam=webbrowser")
 BUY_URL_AMC = "https://www.amctheatres.com/showtimes/{sid}/seats"
@@ -141,11 +142,49 @@ def structure(obj, depth=0, path="", out=None, maxlines=60):
 
 # ---------------------------------------------------------------- browser
 
-def fetch_availability(ctx, t, timeout_ms=60000):
-    """Open the seat selection page, return the availability JSON the page's own JS fetches."""
-    f = t["fandango"]
-    url = SEATSEL_URL.format(**f)
+def resolve_jump_links(ctx, targets):
+    """Load the theatre listing once per date and pick up each target's real
+    "Check Seats" link (jump.aspx with Fandango's showtime hash). Entering the
+    checkout through that link is what sets up the order context the seat
+    picker needs; hitting seatselection directly shows "not found"."""
+    by_date = {}
+    for t in targets:
+        by_date.setdefault(t["fandango"]["sdate"], []).append(t)
     page = ctx.new_page()
+    for sdate, ts in by_date.items():
+        url = THEATER_URL.format(sdate=sdate)
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_selector('a[href*="jump.aspx"]', timeout=45000)
+            time.sleep(3)
+            hrefs = page.evaluate(
+                "() => Array.from(document.querySelectorAll('a[href*=\"jump.aspx\"]')).map(a => a.href)")
+        except Exception as e:
+            log(f"theater page {sdate}: {type(e).__name__}: {str(e)[:150]}; using plain jump links")
+            hrefs = []
+        for t in ts:
+            f = t["fandango"]
+            want_sdate = f"{f['sdate']}+{f['t']}"
+            match = None
+            for h in hrefs:
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(h).query)
+                if q.get("mid", [""])[0] == f["mid"] and q.get("tid", [""])[0] == f["tid"] \
+                        and q.get("sdate", [""])[0].replace(" ", "+") == want_sdate:
+                    match = h
+                    break
+            t["_jump"] = match or BUY_URL_FANDANGO.format(**f)
+            log(f"{t['label']}: entry link {'from listing' if match else 'FALLBACK (no listing match)'}: {t['_jump'][:140]}")
+        time.sleep(4)
+    page.close()
+
+
+def fetch_availability(ctx, t, timeout_ms=60000):
+    """Enter the checkout via the listing's link, return the availability JSON the page's own JS fetches."""
+    f = t["fandango"]
+    url = t.get("_jump") or BUY_URL_FANDANGO.format(**f)
+    page = ctx.new_page()
+    if DRY_RUN:
+        page.on("response", lambda r: _log_xhr(r))
     try:
         with page.expect_response(
             lambda r: "seatpicker/Default.aspx" in r.url and "action=availability" in r.url,
@@ -165,10 +204,23 @@ def fetch_availability(ctx, t, timeout_ms=60000):
         raise
 
 
+def _log_xhr(r):
+    u = r.url
+    if "fandango.com" not in u or re.search(r"\.(css|js|png|jpg|gif|svg|woff2?)(\?|$)", u):
+        return
+    body = ""
+    try:
+        if "json" in (r.headers.get("content-type") or "") or "Default.aspx" in u:
+            body = re.sub(r"\s+", " ", r.text())[:300]
+    except Exception:
+        pass
+    log(f"  xhr {r.status} {r.request.method} {u[:150]} {body}")
+
+
 def diagnostics(page):
     try:
         title = page.title()
-        text = page.evaluate("() => document.body.innerText.replace(/\\s+/g,' ').slice(0, 300)")
+        text = page.evaluate("() => document.body.innerText.replace(/\\s+/g,' ').slice(0, 1200)")
         n = page.evaluate("() => document.querySelectorAll('[class*=Seat], [class*=seat]').length")
         log(f"  diag: title={title!r} seat-ish elements={n} text={text!r}")
     except Exception as e:
@@ -248,6 +300,7 @@ def main():
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() and not DRY_RUN else {}
     with sync_playwright() as p:
         browser, ctx = new_context(p)
+        resolve_jump_links(ctx, TARGETS)
         if DRY_RUN:
             for t in TARGETS:
                 check_one(ctx, state, t, verbose=True)
@@ -274,6 +327,7 @@ def main():
                     log("4 failures in a row; restarting browser")
                     browser.close()
                     browser, ctx = new_context(p)
+                    resolve_jump_links(ctx, TARGETS)
                     fail_streak = 0
             else:
                 fail_streak = 0
