@@ -1,5 +1,13 @@
 name: discover-showtimes
 on:
+  # pushes to a feature branch run a DRY RUN (log only) so changes can be
+  # tested before the workflow lands on main and becomes dispatchable
+  push:
+    branches: ["claude/**"]
+    paths:
+      - discover_showtimes.py
+      - targets.json
+      - .github/workflows/discover.yml
   workflow_dispatch:
     inputs:
       dry_run:
@@ -29,7 +37,7 @@ jobs:
       - name: Discover showtime IDs
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+          DRY_RUN: ${{ github.event_name == 'push' && '1' || github.event.inputs.dry_run || '0' }}
           DATES: ${{ github.event.inputs.dates }}
         run: python3 discover_showtimes.py
       - name: Commit targets
