@@ -28,7 +28,9 @@ _TARGETS_DATA = json.loads(TARGETS_FILE.read_text())
 TARGETS = [(t["label"], t["sid"]) for t in _TARGETS_DATA["targets"] if t.get("sid")]
 MOVIE_NAME = _TARGETS_DATA["config"]["movie_name"]
 RETIRE_AFTER = datetime.fromisoformat(_TARGETS_DATA["config"]["retire_after_utc"])
-RENOTIFY_SECONDS = 2 * 3600
+RENOTIFY_SECONDS = 24 * 3600
+# Kushal only wants alerts for middle rows F-M (single-letter rows, any seat number).
+MID_ROW_RE = re.compile(r"^[F-M]\d{1,2}$")
 CONSEC_FAIL_ALERT = 120  # ~2h of failed 1-min cycles before the stale-cookie alert
 LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))
 NTFY_TOPIC = os.environ["NTFY_TOPIC"]
@@ -83,7 +85,8 @@ def fetch_counts(sid, cookie_hdr):
     avail = [l for l in seats if not l.startswith("Occupied")]
     regular = [l for l in avail if "Wheelchair" not in l and "Companion" not in l]
     codes = [SEAT_CODE_RE.search(l).group(0) for l in regular]
-    return len(regular), len(avail), len(seats), codes
+    mid_codes = [c for c in codes if MID_ROW_RE.match(c)]
+    return len(regular), len(avail), len(seats), codes, mid_codes
 
 
 def check_cycle(state, cookie_hdr, verbose, only=None):
@@ -95,23 +98,25 @@ def check_cycle(state, cookie_hdr, verbose, only=None):
         prev = state.get(key, {})
         entry = dict(prev)
         try:
-            regular, avail, total, codes = fetch_counts(sid, cookie_hdr)
+            regular, avail, total, codes, mid_codes = fetch_counts(sid, cookie_hdr)
         except Exception as e:
             log(f"{key}: check failed: {e}")
             run_failed = True
             state[key] = entry
             continue
-        entry["status"] = "open" if regular > 0 else "full"
-        changed = [regular, avail] != prev.get("last_counts")
-        entry["last_counts"] = [regular, avail]
+        mid = len(mid_codes)
+        entry["status"] = "open" if mid > 0 else "full"
+        changed = [regular, avail, mid] != prev.get("last_counts")
+        entry["last_counts"] = [regular, avail, mid]
         if verbose or changed:
-            log(f"{key}: {regular} regular seats open ({avail} incl. wheelchair, {total} total)")
-        just_opened = regular > 0 and prev.get("status") != "open"
-        renotify = regular > 0 and now - prev.get("last_notified", 0) > RENOTIFY_SECONDS
+            log(f"{key}: {mid} F-M seats open ({regular} regular any row, "
+                f"{avail} incl. wheelchair, {total} total)")
+        just_opened = mid > 0 and prev.get("status") != "open"
+        renotify = mid > 0 and now - prev.get("last_notified", 0) > RENOTIFY_SECONDS
         if just_opened or renotify:
             notify(
                 f"{MOVIE_NAME} IMAX 70mm - Metreon",
-                f"{key}: {regular} seat(s) OPEN: {', '.join(codes[:8])} - tap to buy",
+                f"{key}: {mid} F-M seat(s) OPEN: {', '.join(mid_codes[:8])} - tap to buy",
                 click_url=SEATS_URL.format(sid=sid),
             )
             entry["last_notified"] = now
