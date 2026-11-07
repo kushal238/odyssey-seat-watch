@@ -56,7 +56,7 @@ jobs:
       - name: Install Playwright (for cookie self-minting)
         if: steps.gate.outputs.go == '1'
         run: |
-          python3 -m pip -q install playwright
+          python3 -m pip -q install --user --break-system-packages playwright 2>/dev/null || python3 -m pip -q install --user playwright
           if [ "$RUNNER_OS" = "Linux" ]; then python3 -m playwright install --with-deps chromium 2>&1 | tail -1
           else python3 -m playwright install chromium 2>&1 | tail -1; fi
       - name: Check seats every 60s
