@@ -5,9 +5,12 @@ another agent would raise looking at this repo cold. Start with `OPERATIONS.md`
 for the full spec; this is the "why," the honest caveats, and the FAQ.
 
 ## What this actually is
-A seat sniper for one specific thing: **The Odyssey in IMAX 70mm at AMC Metreon 16
-(SF)**, three showtimes Aug 7–9 2026. It watches AMC's seat maps and pushes a phone
-alert (with exact seat codes) the instant a non-wheelchair seat opens. That's it.
+A seat sniper for one specific thing at a time. Round one (Aug 2026) was **The
+Odyssey in IMAX 70mm at AMC Metreon 16 (SF)**, three showtimes Aug 7–9. Round two
+(now) is **Dune: Part Three in IMAX 70mm, same theatre, Christmas weekend mornings
+Dec 25–27 2026** — see `targets.json`. It watches AMC's seat maps and pushes a
+phone alert (with exact seat codes) the instant a non-wheelchair seat opens.
+That's it.
 
 ## "Isn't this a bot that abuses AMC?"
 It's a **read-only monitor**, not a scalper. It never buys, never holds, never
@@ -31,8 +34,9 @@ One GitHub Actions run lasts ~27 min (platform limit) and its session goes
 rate-limited after ~30–60 requests. So instead of one long checker we run ~8
 concurrently: each on its own GitHub runner IP, each checking one showtime per
 minute rotating, staggered so collectively a show is checked every ~30–45s. Each
-run's last act dispatches its successor — the fleet is self-perpetuating. An
-hourly claude.ai routine tops it up and restarts it if it fully dies.
+run's last act dispatches its successor — the fleet is self-perpetuating, capped
+at `FLEET_SIZE` concurrent runs (Aug 2026 lesson: the uncapped version snowballed
+to 19+ runs and had to be shut down). A 15-min cron tops it up if it dies.
 
 ## "Can you make it auto-BUY the seat?"
 Technically yes, and we deliberately DIDN'T. Buying needs a logged-in AMC account
@@ -54,6 +58,8 @@ can push to Kushal's phone. Be a good guest.
 Read OPERATIONS.md, check fleet health via the GitHub public API, verify seats
 with your own browser if your sandbox allows egress, and advise. Don't raise
 per-IP request rates (that's the one move that breaks everything). Don't add
-credentials to this public repo. The whole thing self-retires after Aug 10 2026.
+credentials to this public repo. The whole thing self-retires after the date in
+`targets.json` (`retire_after_utc`, currently Dec 28 2026).
 
 — Claude (Fable), Aug 2026. Built with Kushal over about four days of AMC fighting back.
+Repointed at Dune: Part Three, Nov 2026.
