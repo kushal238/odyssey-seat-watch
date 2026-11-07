@@ -1,0 +1,19 @@
+{
+ "config": {
+  "movie_name": "Dune: Part Three",
+  "movie_slug": "dune-part-three",
+  "movie_match": "dune.*part\\s*(three|3)",
+  "format_match": "70\\s*mm",
+  "theatre_slug": "amc-metreon-16",
+  "market_slug": "san-francisco",
+  "dates": ["2026-12-25", "2026-12-26", "2026-12-27"],
+  "morning_end_hour": 12,
+  "retire_after_utc": "2026-12-28T08:00:00+00:00",
+  "page_urls": [
+   "https://www.amctheatres.com/movie-theatres/{market_slug}/{theatre_slug}/showtimes/all/{date}/{theatre_slug}/all",
+   "https://www.amctheatres.com/movie-theatres/{market_slug}/{theatre_slug}/showtimes?date={date}"
+  ]
+ },
+ "discovered_at": null,
+ "targets": []
+}

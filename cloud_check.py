@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Cloud seat checker for The Odyssey IMAX 70mm at AMC Metreon 16.
+"""Cloud seat checker: alerts when a regular seat opens for the showtimes in
+targets.json (currently Dune: Part Three, IMAX 70mm, AMC Metreon 16).
 
-Fast-path only: plain HTTP with cookies minted on Kushal's Mac (uploaded as the
-AMC_COOKIES secret whenever the local tracker refreshes them). Verified
-2026-08-04 that these cookies work from datacenter IPs. Runs on a GitHub
-Actions cron; state.json is committed back by the workflow.
+Each run self-mints an AMC session from the runner's own IP with headless
+Chromium, then polls one showtime per minute over plain HTTP with those
+cookies. AMC_COOKIES (a repo secret, optional, historically uploaded from
+Kushal's Mac) is only a fallback if self-minting is blocked. state.json is
+committed back by the workflow. After CONSEC_FAIL_ALERT consecutive failed
+cycles one "checks failing" alert is pushed; success resets the cycle.
 
-If cookies go stale the checks fail; after CONSEC_FAIL_ALERT consecutive
-failures one "wake the Mac" alert is pushed, and success resets the cycle.
+Targets come from targets.json, written by discover_showtimes.py.
 """
 
 import gzip
@@ -21,11 +23,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SEATS_URL = "https://www.amctheatres.com/showtimes/{sid}/seats"
-TARGETS = [
-    ("2026-08-07 10:00pm", "144696961"),
-    ("2026-08-08 10:00am", "144696962"),
-    ("2026-08-09 10:00am", "144696966"),
-]
+TARGETS_FILE = Path(__file__).resolve().parent / "targets.json"
+_TARGETS_DATA = json.loads(TARGETS_FILE.read_text())
+TARGETS = [(t["label"], t["sid"]) for t in _TARGETS_DATA["targets"]]
+MOVIE_NAME = _TARGETS_DATA["config"]["movie_name"]
+RETIRE_AFTER = datetime.fromisoformat(_TARGETS_DATA["config"]["retire_after_utc"])
 RENOTIFY_SECONDS = 2 * 3600
 CONSEC_FAIL_ALERT = 120  # ~2h of failed 1-min cycles before the stale-cookie alert
 LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))
@@ -108,7 +110,7 @@ def check_cycle(state, cookie_hdr, verbose, only=None):
         renotify = regular > 0 and now - prev.get("last_notified", 0) > RENOTIFY_SECONDS
         if just_opened or renotify:
             notify(
-                "Odyssey IMAX 70mm - Metreon",
+                f"{MOVIE_NAME} IMAX 70mm - Metreon",
                 f"{key}: {regular} seat(s) OPEN: {', '.join(codes[:8])} - tap to buy",
                 click_url=SEATS_URL.format(sid=sid),
             )
@@ -120,15 +122,16 @@ def check_cycle(state, cookie_hdr, verbose, only=None):
         state["_consecutive_failures"] = fails
         if fails == CONSEC_FAIL_ALERT:
             notify(
-                "Cloud checker: cookies stale",
-                "Cloud seat checks failing ~2h. Wake the Mac (plug in, lid open) "
-                "so it can mint fresh cookies.",
+                "Cloud checker: checks failing",
+                "Cloud seat checks have failed for ~2h (self-mint blocked and no "
+                "working AMC_COOKIES). Check the seat-watch Actions logs.",
                 priority="high",
             )
     else:
         state["_consecutive_failures"] = 0
 
     STATE_FILE.write_text(json.dumps(state, indent=1))
+    return run_failed
 
 
 def mint_cookies_in_runner():
@@ -165,13 +168,16 @@ def mint_cookies_in_runner():
 
 
 def main():
-    if datetime.now(timezone.utc) > datetime(2026, 8, 10, 7, tzinfo=timezone.utc):
+    if datetime.now(timezone.utc) > RETIRE_AFTER:
         log("past targets; disable the workflow")
         return 0
+    if not TARGETS:
+        log("targets.json has no targets yet; run the discover-showtimes workflow")
+        return 0
 
-    cookies = mint_cookies_in_runner() or json.loads(os.environ["AMC_COOKIES"])
+    cookies = mint_cookies_in_runner() or json.loads(os.environ.get("AMC_COOKIES") or "[]")
     cookie_hdr = "; ".join(
-        f"{c['name']}={c['value']}" for c in cookies if "amctheatres.com" in c["domain"]
+        f"{c['name']}={c['value']}" for c in cookies if "amctheatres.com" in c.get("domain", "")
     )
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
 

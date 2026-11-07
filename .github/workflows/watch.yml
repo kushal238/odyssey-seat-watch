@@ -1,0 +1,86 @@
+name: seat-watch
+# Self-perpetuating fleet of ~FLEET_SIZE concurrent 27-minute checker runs.
+# Each run dispatches one successor as it finishes; the cron is only a top-up
+# that starts a run when the fleet is below size. Both paths are capped by the
+# gate step, so the fleet can't run away like it did in Aug 2026 (19+ runs).
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      test_ping:
+        description: "send a test push from the cloud"
+        default: "0"
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  FLEET_SIZE: 4
+  RETIRE_AFTER_YMD: 20261228   # keep in sync with retire_after_utc in targets.json
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fleet gate (don't exceed FLEET_SIZE runs)
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(date -u +%Y%m%d)" -gt "$RETIRE_AFTER_YMD" ]; then
+            echo "past retire date; not running"; echo "go=0" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$(python3 -c 'import json;print(len(json.load(open("targets.json"))["targets"]))')" = "0" ]; then
+            echo "no targets yet (run discover-showtimes)"; echo "go=0" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          active=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
+                     --status in_progress --json databaseId --jq 'length')
+          queued=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
+                     --status queued --json databaseId --jq 'length')
+          others=$((active + queued - 1))   # exclude this run
+          echo "fleet: $others other runs active/queued (cap $FLEET_SIZE)"
+          if [ "$others" -ge "$FLEET_SIZE" ]; then
+            echo "fleet full; this run exits"; echo "go=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=1" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install Playwright (for cookie self-minting)
+        if: steps.gate.outputs.go == '1'
+        run: |
+          pip -q install playwright
+          playwright install --with-deps chromium 2>&1 | tail -1
+      - name: Check seats every 60s
+        if: steps.gate.outputs.go == '1'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          AMC_COOKIES: ${{ secrets.AMC_COOKIES }}
+          TEST_PING: ${{ github.event.inputs.test_ping || '0' }}
+        run: python3 cloud_check.py
+      - name: Dispatch successor (self-perpetuating chain, capped)
+        if: always() && steps.gate.outputs.go == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ "$(date -u +%Y%m%d)" -le "$RETIRE_AFTER_YMD" ] || exit 0
+          active=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
+                     --status in_progress --json databaseId --jq 'length')
+          queued=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow seat-watch \
+                     --status queued --json databaseId --jq 'length')
+          others=$((active + queued - 1))
+          if [ "$others" -lt "$FLEET_SIZE" ]; then
+            gh workflow run seat-watch --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" || true
+            echo "dispatched successor ($others others active)"
+          else
+            echo "fleet full ($others others active); no successor"
+          fi
+      - name: Commit state
+        if: always() && steps.gate.outputs.go == '1'
+        run: |
+          git config user.name "seat-watch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "update state" && git pull --rebase -X ours && git push)

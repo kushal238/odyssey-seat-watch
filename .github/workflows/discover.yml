@@ -1,0 +1,41 @@
+name: discover-showtimes
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "1 = log what would be picked, don't write targets.json"
+        default: "0"
+      dates:
+        description: "comma-separated YYYY-MM-DD (blank = targets.json config)"
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: discover
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Playwright
+        run: |
+          pip -q install playwright
+          playwright install --with-deps chromium 2>&1 | tail -1
+      - name: Discover showtime IDs
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || '0' }}
+          DATES: ${{ github.event.inputs.dates }}
+        run: python3 discover_showtimes.py
+      - name: Commit targets
+        if: always()
+        run: |
+          git config user.name "seat-watch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add targets.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "update targets" && git pull --rebase -X ours && git push)
