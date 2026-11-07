@@ -148,8 +148,15 @@ def main():
     found = {}
     everything = {}
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(user_agent=UA, viewport={"width": 1400, "height": 1000})
+        # sandbox knobs (unused on GitHub runners): preinstalled browser, egress proxy
+        launch = {"headless": True}
+        if os.environ.get("CHROMIUM_PATH"):
+            launch["executable_path"] = os.environ["CHROMIUM_PATH"]
+        if os.environ.get("PW_PROXY"):
+            launch["proxy"] = {"server": os.environ["PW_PROXY"]}
+        browser = p.chromium.launch(**launch)
+        ctx = browser.new_context(user_agent=UA, viewport={"width": 1400, "height": 1000},
+                                  ignore_https_errors=os.environ.get("PW_IGNORE_TLS") == "1")
         ctx.route("**/*", lambda route: route.abort()
                   if route.request.resource_type in ("image", "media", "font")
                   else route.continue_())
