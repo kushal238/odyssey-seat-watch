@@ -1,20 +1,20 @@
 {
  "Sat 2026-12-26 11:00am": {
-  "status": "open",
+  "status": "full",
   "last_counts": [
    108,
    120,
-   11
+   0
   ],
   "last_notified": 1794367447.831999
  },
  "_consecutive_failures": 7,
  "Sun 2026-12-27 11:00am": {
-  "status": "open",
+  "status": "full",
   "last_counts": [
    127,
    142,
-   6
+   0
   ],
   "last_notified": 1794367509.636607
  }
