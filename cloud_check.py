@@ -29,8 +29,11 @@ TARGETS = [(t["label"], t["sid"]) for t in _TARGETS_DATA["targets"] if t.get("si
 MOVIE_NAME = _TARGETS_DATA["config"]["movie_name"]
 RETIRE_AFTER = datetime.fromisoformat(_TARGETS_DATA["config"]["retire_after_utc"])
 RENOTIFY_SECONDS = 24 * 3600
-# Kushal only wants alerts for middle rows F-M (single-letter rows, any seat number).
-MID_ROW_RE = re.compile(r"^[F-M]\d{1,2}$")
+# Kushal's filter: row F or further back (single-letter rows, no upper cap),
+# and only center seats - within the middle 50% of the row's span, computed
+# per row from the full seat map (outer quarter each side = "corner" seats).
+MIN_ROW = "F"
+CODE_SPLIT_RE = re.compile(r"^([A-Z]{1,2})(\d{1,2})$")
 CONSEC_FAIL_ALERT = 120  # ~2h of failed 1-min cycles before the stale-cookie alert
 LOOP_MINUTES = int(os.environ.get("LOOP_MINUTES", "27"))
 NTFY_TOPIC = os.environ["NTFY_TOPIC"]
@@ -85,7 +88,21 @@ def fetch_counts(sid, cookie_hdr):
     avail = [l for l in seats if not l.startswith("Occupied")]
     regular = [l for l in avail if "Wheelchair" not in l and "Companion" not in l]
     codes = [SEAT_CODE_RE.search(l).group(0) for l in regular]
-    mid_codes = [c for c in codes if MID_ROW_RE.match(c)]
+    row_span = {}
+    for label in seats:
+        row, num = CODE_SPLIT_RE.match(SEAT_CODE_RE.search(label).group(0)).groups()
+        lo, hi = row_span.get(row, (int(num), int(num)))
+        row_span[row] = (min(lo, int(num)), max(hi, int(num)))
+
+    def wanted(code):
+        row, num = CODE_SPLIT_RE.match(code).groups()
+        if len(row) != 1 or row < MIN_ROW:
+            return False
+        lo, hi = row_span[row]
+        margin = (hi - lo) / 4
+        return lo + margin <= int(num) <= hi - margin
+
+    mid_codes = [c for c in codes if wanted(c)]
     return len(regular), len(avail), len(seats), codes, mid_codes
 
 
@@ -109,14 +126,14 @@ def check_cycle(state, cookie_hdr, verbose, only=None):
         changed = [regular, avail, mid] != prev.get("last_counts")
         entry["last_counts"] = [regular, avail, mid]
         if verbose or changed:
-            log(f"{key}: {mid} F-M seats open ({regular} regular any row, "
+            log(f"{key}: {mid} center seats open in row F+ ({regular} regular any seat, "
                 f"{avail} incl. wheelchair, {total} total)")
         just_opened = mid > 0 and prev.get("status") != "open"
         renotify = mid > 0 and now - prev.get("last_notified", 0) > RENOTIFY_SECONDS
         if just_opened or renotify:
             notify(
                 f"{MOVIE_NAME} IMAX 70mm - Metreon",
-                f"{key}: {mid} F-M seat(s) OPEN: {', '.join(mid_codes[:8])} - tap to buy",
+                f"{key}: {mid} center seat(s) row F+ OPEN: {', '.join(mid_codes[:8])} - tap to buy",
                 click_url=SEATS_URL.format(sid=sid),
             )
             entry["last_notified"] = now
