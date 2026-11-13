@@ -2,13 +2,13 @@
  "Sat 2026-12-26 11:00am": {
   "status": "full",
   "last_counts": [
-   108,
-   120,
+   107,
+   119,
    0
   ],
   "last_notified": 1794367447.831999
  },
- "_consecutive_failures": 34,
+ "_consecutive_failures": 7,
  "Sun 2026-12-27 11:00am": {
   "status": "full",
   "last_counts": [
